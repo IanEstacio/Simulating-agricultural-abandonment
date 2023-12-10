@@ -1,0 +1,356 @@
+model scenariosimulation
+
+global {//
+	//--Modeling and simulation fundamentals--
+	//float seedvalue <- 9.0;	
+	float startt <- machine_time;
+	
+	//--Experiment type--
+	int by_optimization <- 0;
+	bool bool_optimization <- by_optimization = 1 ? true:false;
+	bool stop_currentrun <- false;
+	bool is_batch <- false;		
+	bool is_calibration <- false;
+	
+	//--import of files and setting of the environment--	
+	//csv
+	file csv_file_Tabledata <- csv_file("../includes/Final_Yearlytabledata.csv",",");
+	matrix matrix_Tabledata <- matrix(csv_file_Tabledata);
+	file csv_file_paddyfieldarea <- csv_file("../includes/Final_LULCdata.csv",",");
+	matrix matrix_paddyfieldarea <- matrix(csv_file_paddyfieldarea);
+	file csv_file_mappingabandonmentarea <- csv_file("../includes/Mapping_Abandonmentperperiod_rev_scenariosimulation_policy.csv",",");
+	matrix matrix__mappingabandonmentarea <- matrix(csv_file_mappingabandonmentarea);
+	
+	//raster files
+	grid_file raster_file_LCactual1990 <- file('../includes/lcactual1990.asc'); //0
+	grid_file raster_file_slope <- file('../includes/slope.asc'); //2
+	grid_file raster_file_cosaspect <- file('../includes/cosaspect.asc'); //3
+	grid_file raster_file_disttowncenter <- file('../includes/dist_towncenter.asc'); //4
+	grid_file raster_file_distroad <- file('../includes/dist_road.asc'); //5
+	grid_file raster_file_heritage <- file('../includes/heritage.asc'); //6
+	grid_file raster_file_quickflow1990 <- file('../includes/qf1990.asc'); //7
+	grid_file raster_file_densforest1990 <- file('../includes/density_forest1990.asc'); //8
+	grid_file raster_file_denslowveg1990 <- file('../includes/density_lowveg1990.asc'); //9
+	grid_file raster_file_denspaddy1990 <- file('../includes/density_paddyfield1990.asc'); //10
+	
+	grid_file raster_file_quickflow1995 <- file('../includes/qf1995.asc'); //11
+	grid_file raster_file_densforest1995 <- file('../includes/density_forest1995.asc'); //12
+	grid_file raster_file_denslowveg1995 <- file('../includes/density_lowveg1995.asc'); //13
+	grid_file raster_file_denspaddy1995 <- file('../includes/density_paddyfield1995.asc'); //14
+	grid_file raster_file_LCactual1995 <- file('../includes/lcactual1995.asc'); //15
+	
+	
+	grid_file raster_file_quickflow2000 <- file('../includes/qf2000.asc'); //17
+	grid_file raster_file_densforest2000 <- file('../includes/density_forest2000.asc'); //18
+	grid_file raster_file_denslowveg2000 <- file('../includes/density_lowveg2000.asc'); //19
+	grid_file raster_file_denspaddy2000 <- file('../includes/density_paddyfield2000.asc'); //20
+	grid_file raster_file_LCactual2000 <- file('../includes/lcactual2000.asc'); //21
+	
+	/*
+	grid_file raster_file_quickflow2005 <- file('../includes/qf2005.asc'); //23
+	grid_file raster_file_densforest2005 <- file('../includes/density_forest2005.asc'); //24
+	grid_file raster_file_denslowveg2005 <- file('../includes/density_lowveg2005.asc'); //25
+	grid_file raster_file_denspaddy2005 <- file('../includes/density_paddyfield2005.asc'); //26
+	//grid_file raster_file_LCactual2005 <- file('../includes/lcactual2005.asc'); //27
+	
+	grid_file raster_file_quickflow2010 <- file('../includes/qf2010.asc'); //29
+	grid_file raster_file_densforest2010 <- file('../includes/density_forest2010.asc'); //30
+	grid_file raster_file_denslowveg2010 <- file('../includes/density_lowveg2010.asc'); //31
+	grid_file raster_file_denspaddy2010 <- file('../includes/density_paddyfield2010.asc'); //32
+	//grid_file raster_file_LCactual2010 <- file('../includes/lcactual2010.asc'); //33
+	*/
+	
+	grid_file raster_file_quickflow2015 <- file('../includes/qf2015.asc');
+	grid_file raster_file_densforest2015 <- file('../includes/density_forest2015.asc'); //30
+	grid_file raster_file_denslowveg2015 <- file('../includes/density_lowveg2015.asc'); //31
+	grid_file raster_file_denspaddy2015 <- file('../includes/density_paddyfield2015.asc'); //32
+	grid_file raster_file_LCactual2015 <- file('../includes/lcactual2015.asc');
+	
+	grid_file raster_file_quickflow2020 <- file('../includes/qf2020.asc');
+	grid_file raster_file_densforest2020 <- file('../includes/density_forest2020.asc'); //30
+	grid_file raster_file_denslowveg2020 <- file('../includes/density_lowveg2020.asc'); //31
+	grid_file raster_file_denspaddy2020 <- file('../includes/density_paddyfield2020.asc'); //32
+	grid_file raster_file_LCactual2020 <- file('../includes/lcactual2020.asc');
+	 
+	//boundary
+	geometry shape <- envelope(raster_file_LCactual1990);
+
+	//--Constant parameters through all scenarios (based on data)--
+	//Time-constant
+	int startingyear <- 1990;
+	int endingyear <- 2050;
+	float coef_slope <- 0.0499;
+	float coef_cosaspect <- -0.303;
+	float coef_quickflow <- 0.000360;
+	float coef_disttowncenter <- 0.000198;
+	float coef_distroad <- -0.000281;
+	float coef_heritage <- -0.841;
+	float coef_densforest <- 1.210;
+	float coef_denslowveg <- 2.010;
+	float coef_denspaddy <- -2.540;
+	//Time-changing
+	float actual_paddyfieldarea <- 0.0;
+
+	//--Temporal variables--
+	//year
+    int current_year;
+	//LUCC
+	float Permanentlyabandonedarea;
+	int Permanentlyabandonedcount;
+	float PeriodicPermanentlyabandonedarea;
+	int PeriodicPermanentlyabandonedcount;
+	float Paddyfieldarea;
+    int Paddyfieldcount;
+    list yearlypaddyfieldarea;
+    
+    //--initialization setting--
+    init{    	    	
+    	write startingyear;
+		current_year <- startingyear;
+    	
+		ask grid_cell {			
+			neighbours  <- self neighbors_at 1;
+			LCtype  <- bands[0];
+			paddyfield <- LCtype = 1.0 ? true:false;
+			paddyfieldactual <- -1.0;
+			paddyfieldmodel <- -1.0;
+			grid_value <- -1.0;
+			paddyLUCCprob <- -1.0;
+			if LCtype > 1.0{
+				paddyfieldactual <- 0.0;
+				paddyfieldmodel <- 0.0;
+				grid_value <- 0.0;
+			}
+			if paddyfield{
+				paddyfieldactual <- 1.0;
+				paddyfieldmodel <- 1.0;
+				grid_value <- 1.0;
+				paddyLUCCprob <- 0.0;
+			}
+			if grid_value >= 0{
+				color <- rgb(255, 255*(grid_value),0);
+			} else{
+				color <- #black;
+			}
+			
+			if paddyfieldactual = 1.0{
+				cat_actual <- "Paddyfield";
+			} else if paddyfieldactual = 0.0{
+				cat_actual <- "otherlandcover";
+			} else{
+				cat_actual <- "NODATA";
+			}
+			realdata <- cat_actual = "NODATA" ? false: true;
+		}
+		ask factorsnondens {	
+			slope <- bands[1];
+			cosaspect <- bands[2];
+			disttowncenter <- bands[3];
+			distroad <- bands[4];
+			heritage <- bands[5];
+			quickflow <- bands[6];
+			color <- rgb(255, 40*slope,0);
+		}
+		ask factorsdens {	
+			densforest <- bands[1];
+			denslowveg <- bands[2];
+			denspaddy <- bands[3];
+			color <- rgb(255, 255*densforest,0);
+		}
+    }
+
+	reflex sequenceswithinayear when: (current_year != endingyear){
+		if is_calibration{
+			if current_year = 1995 or current_year = 2000 
+			or current_year = 2015 or current_year = 2020{
+				do Updaterasterbandsandactualabandonment;
+				write "updated";
+			}			
+		}
+		if current_year = 1994 or current_year = 1999 or current_year = 2004 
+			or current_year = 2009 or current_year = 2014 or current_year = 2019 or current_year = 2049{
+				do Changesbasedonsmallscaleprocesses;        	   			
+		}
+		current_year <- cycle + startingyear + 1;
+		write current_year;
+		if is_calibration{
+			if current_year = 1995 or current_year = 2000
+			or current_year = 2015 or current_year = 2020 or current_year = 2050{
+				do Generationofnewlandusemap;   	   			
+			}
+			if current_year = 2050{
+				save grid_cell to:"../results/Maps/Revised_Mapping_Scenariosimulation1_policy"+current_year+"_asc.asc" type:"asc";
+    			save grid_cell to:"../results/Maps/Revised_Mapping_Scenariosimulation1_policy"+current_year+"_tif.tif" type:"geotiff";          	   			
+			}			
+		}
+	}
+
+	reflex stop_simulation when: current_year = endingyear{
+        write "End of simulation. Duration: " + (machine_time - startt)/1000;
+		stop_currentrun <- true;
+		if !is_batch{
+			//save grid_cell to:"../results/LCasc_calib.asc" type:"asc";
+    		//save grid_cell to:"../results/LCtif_calib.tif" type:"geotiff";				
+			do pause;
+		} 		   	
+    }
+    
+    action Updaterasterbandsandactualabandonment{
+		int rindex <- int((current_year-startingyear)/5);
+		if current_year = 2015{
+			rindex <- 3;
+		} else if current_year = 2020{
+			rindex <- 4;
+		}
+		int quickflowindex <- rindex + 6;
+		int densforestindex <- 3*rindex + 1;
+		int denslowvegindex <- 3*rindex + 2;
+		int denspaddyindex <- 3*rindex + 3;
+		ask factorsnondens{
+			quickflow <- bands[quickflowindex];			
+		}
+		ask factorsdens{
+			densforest <- bands[densforestindex];
+			denslowveg <- bands[denslowvegindex];
+			denspaddy <- bands[denspaddyindex];			
+		}
+	}
+
+	
+	action Changesbasedonsmallscaleprocesses{
+		//float formerpaddyfieldarea <- 6442200.0;
+		//int formerpaddyfieldcount <- int(formerpaddyfieldarea/900.0);
+    	//Paddyfieldarea <- 5996621.311;
+		//Paddyfieldcount <- int(Paddyfieldarea/900.0);
+		//Permanentlyabandonedarea <-  formerpaddyfieldarea - Paddyfieldarea; 
+		//Permanentlyabandonedcount <- int(Permanentlyabandonedarea/900.0);
+		//PeriodicPermanentlyabandonedarea <- 0.0;
+		//PeriodicPermanentlyabandonedarea <-  PeriodicPermanentlyabandonedarea + Permanentlyabandonedarea; 
+		
+		list yearcolumn <- matrix__mappingabandonmentarea column_at 0;
+		int index <- yearcolumn index_of float(current_year);
+		//int index <- yearcolumn index_of current_year;
+		PeriodicPermanentlyabandonedarea <- float(matrix__mappingabandonmentarea[1,index]);
+		PeriodicPermanentlyabandonedcount <- int(PeriodicPermanentlyabandonedarea/900.0);
+		//add Paddyfieldarea to: yearlypaddyfieldarea;		
+	}
+	
+	action Generationofnewlandusemap{
+		ask grid_cell{		
+			if paddyfield{
+				paddyLUCCprob <- 1.0/(1.0+exp(-1.0*((coef_slope*factorsnondens(location).slope)+
+						(coef_cosaspect*factorsnondens(location).cosaspect)+
+						(coef_quickflow*factorsnondens(location).quickflow)+
+						(coef_disttowncenter*factorsnondens(location).disttowncenter)+
+						(coef_distroad*factorsnondens(location).distroad)+
+						(coef_heritage*factorsnondens(location).heritage)+
+						(coef_densforest*factorsdens(location).densforest)+
+						(coef_denslowveg*factorsdens(location).denslowveg)+
+						(coef_denspaddy*factorsdens(location).denspaddy))));							
+			}
+		}
+		float allocatedPermanentlyabandonedcount <- 0.0;
+		write "PeriodicPermanentlyabandonedcount"+PeriodicPermanentlyabandonedcount;
+		loop while: PeriodicPermanentlyabandonedcount != allocatedPermanentlyabandonedcount{
+			float highestprob <- grid_cell 
+								where (each.paddyfield and each.paddyLUCCprob <= 1 and each.paddyLUCCprob >= 0) 
+								max_of each.paddyLUCCprob;
+			grid_cell highestprobcell <- (grid_cell where (each.paddyfield and each.paddyLUCCprob=highestprob))[0];
+			highestprobcell.LCtype <- 4.0;
+			highestprobcell.paddyfield <- false;	
+			highestprobcell.paddyfieldmodel <- 0.0;
+			highestprobcell.grid_value <- 0.0;
+			allocatedPermanentlyabandonedcount <- allocatedPermanentlyabandonedcount + 1;
+		}
+		PeriodicPermanentlyabandonedarea <- 0.0;
+		PeriodicPermanentlyabandonedcount <- 0;
+		ask grid_cell{
+			if grid_value >= 0{
+				color <- rgb(255, 255*(grid_value),0);
+			} else{
+				color <- #black;
+			}
+		}	
+	}
+	
+}
+
+grid grid_cell use_regular_agents: false files: [raster_file_LCactual1990, 
+					 raster_file_LCactual1995,					 
+					raster_file_LCactual2000,
+					raster_file_LCactual2015,
+					raster_file_LCactual2020
+					]{	
+	list<grid_cell> neighbours;
+	float LCtype;
+	bool paddyfield;
+	float paddyfieldactual;
+	float paddyfieldmodel;
+	float paddyLUCCprob;
+
+	//For accuracy
+	string cat_actual;
+	string cat_model;
+	bool realdata;
+	
+	//Visualization
+	rgb color_actual;
+	rgb color_modelled;
+	rgb color_fuzzy;
+	aspect actual{
+		draw shape color: color_actual;
+	}
+	aspect modelled{
+		draw shape color: color_modelled;
+	}
+	aspect fuzzy{
+		draw shape color:color_fuzzy;
+	}			
+}
+
+grid factorsnondens use_regular_agents: false files: [raster_file_LCactual1990, raster_file_slope,raster_file_cosaspect,   
+					raster_file_disttowncenter, raster_file_distroad, raster_file_heritage, 
+					raster_file_quickflow1990, raster_file_quickflow1995, 
+					raster_file_quickflow2000, /*raster_file_quickflow2005, 
+					raster_file_quickflow2010,*/ raster_file_quickflow2015,
+					raster_file_quickflow2020
+					]{
+	//abandonment probability factors
+	//constant	
+	float slope;
+	float cosaspect;
+	float disttowncenter;
+	float distroad;
+	float heritage;	
+	//changing	
+	float quickflow;						
+}
+
+grid factorsdens use_regular_agents: false files: [raster_file_LCactual1990, raster_file_densforest1990, raster_file_denslowveg1990, raster_file_denspaddy1990, 
+					raster_file_densforest1995, raster_file_denslowveg1995, raster_file_denspaddy1995,					
+					raster_file_densforest2000, raster_file_denslowveg2000, raster_file_denspaddy2000,					
+					//raster_file_densforest2005, raster_file_denslowveg2005, raster_file_denspaddy2005,
+					//raster_file_densforest2010, raster_file_denslowveg2010, raster_file_denspaddy2010,
+					raster_file_densforest2015, raster_file_denslowveg2015, raster_file_denspaddy2015,
+					raster_file_densforest2020, raster_file_denslowveg2020, raster_file_denspaddy2020
+					]{
+	float densforest;
+	float denslowveg;
+	float denspaddy;	
+}
+
+experiment Mapping type: gui{
+	parameter "Batch mode:" var: is_batch <- false;
+	parameter "Calibration mode:" var: is_calibration <- true;
+	output {
+		display map_display type: java2D {
+			grid grid_cell;
+		}
+	}
+
+    /*reflex save_results_explo{
+		save grid_cell to:"../results/Maps/Mapping_"+endingyear+"_asc.asc" type:"asc";
+    	save grid_cell to:"../results/Maps/Mapping_"+endingyear+"_tif.tif" type:"geotiff";          	   
+    }*/
+}
+
